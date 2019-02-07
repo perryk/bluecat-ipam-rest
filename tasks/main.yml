@@ -1,8 +1,23 @@
 ---
 # tasks file for bluecat-ipam-rest
+
+- name: Prepare API and collect ID's for use later
+  include: preparation.yml
+  when: state == 'prepare' or state == 'preparation'
+  delegate_to: localhost
+  connection: local
+  run_once: true
+
 - name: Acquire IP Address
   include: acquire_ip.yml
   when: state == 'present' or state == 'acquire'
+  delegate_to: localhost
+  connection: local
+  run_once: true
+
+- name: Log out of API 
+  include: finish.yml
+  when: state == 'finish' or state == 'complete'
   delegate_to: localhost
   connection: local
   run_once: true

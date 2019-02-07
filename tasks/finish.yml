@@ -1,0 +1,17 @@
+---
+# Acquires a static IP address from Bluecat Address Manager 
+# via REST API and creates a DNS entry.  
+# Pull back existing IP if host record already exists
+
+# This script simply finishes and cleans up by signing out of the API
+
+- name: Logout of API
+  uri:
+    url: "{{ bluecat_url }}/Services/REST/v1/logout"
+    headers:
+      Authorization: "{{ api_token }}"
+    method: GET
+    validate_certs: "{{ validate_certs }}"
+    return_content: yes
+  register: logout_output
+
