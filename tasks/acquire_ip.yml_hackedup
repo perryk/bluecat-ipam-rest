@@ -60,41 +60,55 @@
 - debug:
     msg: "View ID is {{ viewId }}"
 
-# Using curl as I struggled with hint field in uri
-- name: Check if host record already exists
-  command: > 
-    curl -k -H "Authorization: {{ api_token }}" {{ bluecat_url }}/Services/REST/v1/getHostRecordsByHint?containerId={{ viewId }}&start=0&count=1&options="hint=^{{ target_hostname }}{{ bluecat_network_dnsdomain }}$|retrieveFields=false"
-  changed_when: false
-  register: host_record_output
+## Using curl as I struggled with hint field in uri
+#- name: Check if host record already exists
+#  uri:
+#      url: '{{ bluecat_url }}/Services/REST/v1/getHostRecordsByHint?containerId={{ viewId }}&start=0&count=1&options="hint=^{{ target_hostname }}$|retrieveFields=false'
+#   headers:
+#      Authorization: "{{ api_token }}"
+#   method: GET
+#    validate_certs: "{{ validate_certs }}"
+#    return_content: yes
+#    #  command: > 
+#      #curl -k -H 'Authorization: {{ api_token }}" {{ bluecat_url }}/Services/REST/v1/getHostRecordsByHint?containerId={{ viewId }}&start=0&count=1&options="hint=^{{ target_hostname }}$|retrieveFields=false'
+#  changed_when: false
+#  register: host_record_output
 
-- name: Set DNS Entry Fact
-  set_fact:
-    dnsId: "{{ (host_record_output.stdout | from_json | first).id }}"
-  when: host_record_output.stdout != "[]"
+#- debug: 
+#    msg: "Host Record output from byhint is {{ host_record_output }}"
 
-- name: Get ID of linked IP address
-  uri:
-    url: "{{ bluecat_url }}/Services/REST/v1/getLinkedEntities?entityId={{ dnsId }}&type=IP4Address&start=0&count=10"
-    headers:
-      Authorization: "{{ api_token }}"
-    method: GET
-    validate_certs: "{{ validate_certs }}"
-    return_content: yes
-  register: linked_ip_output
-  when: host_record_output.stdout != "[]"
+#- name: Set DNS Entry Fact
+#  set_fact:
+#    #    dnsId: "{{ (host_record_output.stdout | from_json | first).id }}"
+#    dnsId: "{{ (host_record_output.content|from_json)[0].id }}"
+#    #  when: host_record_output.stdout != "[]"
 
-- name: Zero out ipId from previous role runs
-  set_fact:
-    ipId: ""
+#- debug: 
+#    msg: "Host Record dnsID {{ dnsId }}"
 
-- name: Set Existing IP ID Fact
-  set_fact:
-    ipId: "{{ (linked_ip_output.json | last).id }}"
-  when: host_record_output.stdout != "[]"
+#- name: Get ID of linked IP address
+#  uri:
+#    url: "{{ bluecat_url }}/Services/REST/v1/getLinkedEntities?entityId={{ dnsId }}&type=IP4Address&start=0&count=10"
+#    headers:
+#      Authorization: "{{ api_token }}"
+#    method: GET
+#    validate_certs: "{{ validate_certs }}"
+#    return_content: yes
+#  register: linked_ip_output
+#  # when: host_record_output.stdout != "[]"
 
-- debug:
-    msg: "DNS entry exists at ID <{{ dnsId }}> pointing to IP ID <{{ ipId }}>"
-  when: host_record_output.stdout != "[]"
+#- name: Zero out ipId from previous role runs
+#  set_fact:
+#    ipId: ""
+
+#- name: Set Existing IP ID Fact
+#  set_fact:
+#    ipId: "{{ (linked_ip_output.json | last).id }}"
+#   # when: host_record_output.stdout != "[]"
+
+#- debug:
+#    msg: "DNS entry exists at ID <{{ dnsId }}> pointing to IP ID <{{ ipId }}>"
+#    # when: host_record_output.stdout != "[]"
 
 - name: Get ID of your network
   uri:
@@ -125,12 +139,9 @@
     # Using command as I struggled with uri to handle address_properties
     - name: Assign Next Available static IP in the network
       command: >
-        curl -k -H "Authorization: {{ api_token }}" -X POST {{ bluecat_url }}/Services/REST/v1/assignNextAvailableIP4Address?configurationId={{ configurationId }}&parentId={{ networkId }}&macAddress={{ target_macaddress }}&hostInfo={{ target_hostname }}{{ bluecat_network_dnsdomain }},{{ viewId }},true,false&action=MAKE_DHCP_RESERVED&properties="{{ address_properties }}{{ address_properties_udfs|urlencode()}}"
+        curl -k -H "Authorization: {{ api_token }}" -X POST {{ bluecat_url }}/Services/REST/v1/assignNextAvailableIP4Address?configurationId={{ configurationId }}&parentId={{ networkId }}&macAddress=""&hostInfo={{ target_hostname }},{{ viewId }},true,false&action=MAKE_STATIC&properties="{{ address_properties }}"
       changed_when: False
       register: assign_ip_output
-
-    - debug:
-        msg: "assign output is {{ assign_ip_output }}"
 
     - name: Set IP Changed Fact
       set_fact:
@@ -151,17 +162,17 @@
     msg: "IP not assigned for network <{{ bluecat_network_cidr }}>"
   when: ipId is undefined or ipId == ""
 
-#- name: Execute Quick Deploy for the given network 
-#  uri:
-#    url: "{{ bluecat_url }}/Services/REST/v1/quickDeploy?entityId={{ networkId }}"
-#    headers:
-#      Authorization: "{{ api_token }}"
-#    method: POST
-#    validate_certs: "{{ validate_certs }}"
-#    return_content: yes
-#  when: ip_changed is defined
-#  changed_when: true
-#  register: quick_deploy_output
+- name: Execute Quick Deploy for the given network 
+  uri:
+    url: "{{ bluecat_url }}/Services/REST/v1/quickDeploy?entityId={{ networkId }}"
+    headers:
+      Authorization: "{{ api_token }}"
+    method: POST
+    validate_certs: "{{ validate_certs }}"
+    return_content: yes
+  when: ip_changed is defined
+  changed_when: true
+  register: quick_deploy_output
 
 - name: Get IP address record 
   uri:
